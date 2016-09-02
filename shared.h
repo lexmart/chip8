@@ -50,11 +50,14 @@ typedef struct
     b32 Initialized;
     memory_block MainMemory;
     memory_block Program;
-    u8 *ProgramLocation;
+    u16 ProgramCounter;
     
     u8 Registers[16];
     u16 AddressRegister;
+    
+    u8 StackPointer;
     u16 Stack[16];
+    
     u8 DelayTimer;
     u8 SoundTimer;
 } emulator_state;

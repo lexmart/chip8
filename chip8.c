@@ -16,6 +16,10 @@
 #define WHITE 0xFFFFFFFF
 #define BLACK 0x000000FF
 
+internal void DrawRectangle(screen *Screen, int MinX, int MinY, int MaxX, int MaxY, u32 Color);
+
+#include "chip8_instructions.c"
+
 internal void
 DrawRectangle(screen *Screen, int MinX, int MinY, int MaxX, int MaxY, u32 Color)
 {
@@ -61,15 +65,12 @@ IsPointerBounded(void *Base, int Size, void *Pointer)
 internal u16
 GetNextInstruction(emulator_state *State)
 {
-    Assert(State->ProgramLocation < (State->MainMemory.Base + State->MainMemory.Bytes));
+    u16 Result = 0;
     
-    u8 *ProgramLocation = State->ProgramLocation;
-    u16 Result = (*ProgramLocation++ << 8);
-    Result |= *ProgramLocation++;
-    
-    if(IsPointerBounded(State->Program.Base, State->Program.Bytes, ProgramLocation))
+    if((State->ProgramCounter >= 0) && (State->ProgramCounter < State->Program.Bytes))
     {
-        State->ProgramLocation = ProgramLocation;
+        Result = *(State->Program.Base + State->ProgramCounter++) << 8;
+        Result |= *(State->Program.Base + State->ProgramCounter++);
     }
     
     return Result;
@@ -80,19 +81,6 @@ GetQuadValue(u16 Instruction, int QuadIndex)
 {
     u16 Result = (Instruction >> (4*QuadIndex)) & 0xF;
     return Result;
-}
-
-internal void
-JumpToAddress(emulator_state *State, u16 Address)
-{
-    printf("Jumping to address 0x%x\n", Address);
-}
-
-internal void
-ReturnFromFunction(emulator_state *State)
-{
-    printf("returning from function\n");
-    // TODO(lex): Set the program counter to address at the top of the stack, subtract 1 from the stack pointer
 }
 
 CHIP8_CYCLE
@@ -119,7 +107,7 @@ CHIP8_CYCLE
             {
                 fread(State->Program.Base, 1, FileSize, FileHandle);
                 State->Program.Bytes = FileSize;
-                State->ProgramLocation = State->Program.Base;
+                State->ProgramCounter = 0;
             }
             else
             {
@@ -134,28 +122,157 @@ CHIP8_CYCLE
         }
     }
     
-    Assert(IsPointerBounded(State->Program.Base, State->Program.Bytes, State->ProgramLocation));
+    //Assert((State->ProgramCounter >= 0) && (State->ProgramCounter < State->Program.Bytes));
     
     u16 Instruction = GetNextInstruction(State);
+    
+    // TODO(lex): Put this in ParseInstruction...
+    
     u16 Quads[4];
     Quads[0] = GetQuadValue(Instruction, 3);
     Quads[1] = GetQuadValue(Instruction, 2);
     Quads[2] = GetQuadValue(Instruction, 1);
     Quads[3] = GetQuadValue(Instruction, 0);
     
-    if(Quads[0] == 0)
+    u16 Address = (Quads[1] << 8) | (Quads[2] << 4) | Quads[3];
+    u8 RegX = (u8)Quads[1];
+    u8 RegY = (u8)Quads[2];
+    u8 Value = (u8)((Quads[2] << 4) | Quads[3]);
+    
+    if(Instruction == 0x00E0)
     {
-        // NOTE(lex): Jump to address
-        u16 JumpAddress = (Quads[1] << 12) | (Quads[2] << 4) | (Quads[3]);
-        JumpToAddress(State, JumpAddress);
-    }
-    else if(Instruction == 0x00E0)
-    {
-        // NOTE(lex): Clear screen
-        DrawRectangle(Screen, 0, 0, Screen->Width - 1, Screen->Height - 1, BLACK);
+        // NOTE(lex): CLS
+        // NOTE(lex): Clear the screen
+        printf("CLS\n");
     }
     else if(Instruction == 0x00EE)
     {
-        ReturnFromFunction(State);
+        // NOTE(lex): RET
+        // NOTE(lex): Return from subroutine
+        printf("RET\n");
+    }
+    else if(Quads[0] == 1)
+    {
+        // NOTE(lex): JP addr
+        // NOTE(lex): Jump to address
+        printf("JP %d\n", Address);
+    }
+    else if(Quads[0] == 2)
+    {
+        // NOTE(lex): CALL addr
+        // NOTE(lex): Calls function at addr
+        printf("CALL %d\n", Address);
+    }
+    else if(Quads[0] == 3)
+    {
+        // NOTE(lex): SE Vx, value
+        // NOTE(lex): Skip next instruction if Vx = value
+        printf("SE V%d, %d\n", RegX, Value);
+    }
+    else if(Quads[0] == 4)
+    {
+        // NOTE(lex): SNE Vx, value
+        // NOTE(lex): Skip next instruction if Vx != value
+        printf("SNE V%d, %d\n", RegX, Value);
+    }
+    else if((Quads[0] == 5) && (Quads[3] == 0))
+    {
+        // NOTE(lex): SE Vx, Vy
+        // NOTE(lex): Skip next instruction if Vx = Vy
+        printf("SE V%d, V%d\n", RegX, RegY);
+    }
+    else if(Quads[0] == 6)
+    {
+        // NOTE(lex): LD Vx, value
+        // NOTE(lex): Put value into register
+        printf("LD V%d %d\n", RegX, Value);
+    }
+    else if(Quads[0] == 7)
+    {
+        // NOTE(lex): ADD Vx, value
+        // NOTE(lex): Adds value to register
+        printf("ADD V%d, %d\n", RegX, Value);
+    }
+    else if((Quads[0] == 8) && (Quads[3] == 0))
+    {
+        // NOTE(lex): LD Vx, Vy
+        // NOTE(lex): Set RegX = RegY
+        printf("LD V%d V%d\n", RegX, RegY);
+    }
+    else if((Quads[0] == 8) && (Quads[3] == 1))
+    {
+        // NOTE(lex): OR Vx, Vy
+        // NOTE(lex): Set RegX = (RegX | RegY)
+        printf("OR V%d, V%d\n", RegX, RegY);
+    }
+    else if((Quads[0] == 8) && (Quads[3] == 2))
+    {
+        // NOTE(lex): AND Vx, Vy
+        // NOTE(lex): Set RegX = (RegX & RegY)
+        printf("AND V%d, V%d\n", RegX, RegY);
+    }
+    else if((Quads[0] == 8) && (Quads[3] == 3))
+    {
+        // NOTE(lex): XOR Vx, Vy
+        // NOTE(lex): Set RegX = (RegX ^ RegY)
+        printf("XOR V%d, V%d\n", RegX, RegY);
+    }
+    else if((Quads[0] == 8) && (Quads[3] == 4))
+    {
+        // NOTE(lex): ADD Vx, Vy
+        // NOTE(lex): Set RegX = (RegX + RegY). If the results are greater than 8 bits, set RegF = 1, otherwise 0.
+        printf("ADD V%d, V%d\n", RegX, RegY);
+    }
+    else if((Quads[0] == 8) && (Quads[3] == 5))
+    {
+        // NOTE(lex): SUB Vx, Vy
+        // NOTE(lex): If RegX > RegY, set RegX = RegX - RegY and RegF = 1.
+        // NOTE(lex): Otherwise RegF = 0.
+        // TODO(lex): What if RegX <= RegY, do I still subtract? Aren't registers unsigned, how does that work???
+        printf("XOR V%d, V%d\n", RegX, RegY);
+    }
+    else if((Quads[0] == 8) && (Quads[3] == 6))
+    {
+        // NOTE(lex): SHR Vx
+        // NOTE(lex): Set RegX = RegX >> 1. If LSB of RegX is 1, set RegF = 1 otherwise 0.
+        printf("SHR V%d\n", RegX);
+    }
+    else if((Quads[0] == 8) && (Quads[3] == 7))
+    {
+        // NOTE(lex): SUBN Vx, Vy
+        // NOTE(lex): If RegY > RegX, set RegX = RegY - RegX and RegF = 1.
+        // NOTE(lex): Otherwise RegF = 0.
+        // TODO(lex): What if RegY <= RegX, do I still subtract? Aren't registers unsigned, how does that work???
+        printf("XOR V%d, V%d\n", RegX, RegY);
+    }
+    else if((Quads[0] == 8) && (Quads[3] == 0xE))
+    {
+        // NOTE(lex): SHL Vx
+        // NOTE(lex): Set RegX = RegX << 1. If MSB of RegX is 1, set RegF = 1 otherwise 0.
+        printf("SHL V%d\n", RegX);
+    }
+    else if((Quads[0] == 9) && (Quads[3] == 0))
+    {
+        // NOTE(lex): SNE Vx, Vy
+        // NOTE(lex): Skip next instruction if Vx != Vy
+        printf("SNE V%d, V%d\n", RegX, RegY);
+    }
+    else if(Quads[0] == 0xA)
+    {
+        // NOTE(lex): LD I, addr
+        // NOTE(lex): Set RegI = addr
+        printf("LD I,%d\n", Address);
+    }
+    else if(Quads[0] == 0xB)
+    {
+        // NOTE(lex): JP V0, addr
+        // NOTE(lex): Program counter set to Reg0 + addr
+        printf("JP V0, %d\n", Address);
+    }
+    else if(Quads[0] == 0xC)
+    {
+        // NOTE(lex): RND Vx, value
+        // NOTE(lex): Vx = random byte AND value
+        printf("RND V%d, %d", RegX, Value);
     }
 }
