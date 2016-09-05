@@ -1,9 +1,5 @@
-/* TODO
--Build an assembler to make writing programs easier? (With labels for code)
-*/
-
-/* NOTES
--All instructions are on even bytes (pad sprites)
+/*
+// NOTE(lex): Thanks to http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#Dxyn for chip8 documentation!
 */
 
 #include "shared.h"
@@ -273,6 +269,77 @@ CHIP8_CYCLE
     {
         // NOTE(lex): RND Vx, value
         // NOTE(lex): Vx = random byte AND value
-        printf("RND V%d, %d", RegX, Value);
+        printf("RND V%d, %d\n", RegX, Value);
+    }
+    else if(Quads[0] == 0xD)
+    {
+        // NOTE(lex): DRW Vx, Vy, nibble
+        // NOTE(lex): Display nibble-byte sprite (memory set in I) at position (RegX, RegY). Set RegF = collision.
+    }
+    else if((Quads[0] == 0xE) && (Quads[2] == 9) && (Quads[3] == 0xE))
+    {
+        // NOTE(lex): SKP Vx
+        // NOTE(lex): Skip next instruction if key with value RegX is pressed
+        printf("SKP V%d\n", Quads[1]);
+    }
+    else if((Quads[0] == 0xE) && (Quads[2] == 0xA) && (Quads[3] == 1))
+    {
+        // NOTE(lex): SKNP Vx
+        // NOTE(lex): Skil next instruction if key with value RegX is not pressed
+        printf("SKNP V%d\n", Quads[1]);
+    }
+    else if((Quads[0] == 0xF) && (Quads[2] == 0) && (Quads[3] == 7))
+    {
+        // NOTE(lex): LD Vx, DT
+        // NOTE(lex): The value of the delay timer is placed into RegX
+        printf("LD Vx, DT\n");
+    }
+    else if((Quads[0] == 0xF) && (Quads[2] == 0) && (Quads[3] == 0xA))
+    {
+        // NOTE(lex): LD Vx, K
+        // NOTE(lex): Wait for key press, store value of the key in RegX
+        printf("LD Vx, K\n");
+    }
+    else if((Quads[0] == 0xF) && (Quads[2] == 1) && (Quads[3] == 5))
+    {
+        // NOTE(lex): LD DT, Vx
+        // NOTE(lex): Set delay timer equal to value of RegX
+        printf("LD DT, Vx\n");
+    }
+    else if((Quads[0] == 0xF) && (Quads[2] == 1) && (Quads[3] == 8))
+    {
+        // NOTE(lex): LD ST, Vx
+        // NOTE(lex): Sound timer set equal to RegX
+        printf("LD ST, Vx\n");
+    }
+    else if((Quads[0] == 0xF) && (Quads[2] == 1) && (Quads[3] == 0xE))
+    {
+        // NOTE(lex): ADD I, Vx
+        // NOTE(lex): Add RegI and RegX, store value in I
+        printf("ADD I, Vx\n");
+    }
+    else if((Quads[0] == 0xF) && (Quads[2] == 2) && (Quads[3] == 9))
+    {
+        // NOTE(lex): LD F, Vx
+        // NOTE(lex): Set RegI = Memory location of hexadecimal digit sprite location
+        printf("LD F, Vx\n");
+    }
+    else if((Quads[0] == 0xF) && (Quads[2] == 3) && (Quads[3] == 3))
+    {
+        // NOTE(lex): LD B, Vx
+        // NOTE(lex): Takes decimal value of Regx and stores hundreds digit in I, tens digit in I+1, and ones in I+2.
+        printf("LD B, Vx\n");
+    }
+    else if((Quads[0] == 0xF) && (Quads[2] == 5) && (Quads[3] == 5))
+    {
+        // NOTE(lex): LD [I], Vx
+        // NOTE(lex): Store registers Reg0..RegX in memory starting at location I.
+        printf("LD [I], Vx\n");
+    }
+    else if((Quads[0] == 0xF) && (Quads[2] == 6) && (Quads[3] == 5))
+    {
+        // NOTE(lex): LD Vx, [I]
+        // NOTE(lex): Load memory starting from I into registers Reg0..RegX.
+        printf("LD Vx, [I]\n");
     }
 }
