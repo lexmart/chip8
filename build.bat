@@ -25,4 +25,6 @@ cl %CompilerFlags% ..\chip8.c -LD -link -incremental:no /EXPORT:Chip8Cycle
 
 cl %CompilerFlags% ../chip8_sdl.c  /I W:\chip8\SDL\include /link chip8.lib /LIBPATH:W:\chip8\SDL\lib\x64 SDL2.lib SDL2main.lib /SUBSYSTEM:CONSOLE
 
+REM cl %CompilerFlags% ../chip8_assembler.c
+
 popd

@@ -130,6 +130,8 @@ CHIP8_CYCLE
     Quads[2] = GetQuadValue(Instruction, 1);
     Quads[3] = GetQuadValue(Instruction, 0);
     
+    printf("%x%x %x%x\n", Quads[0], Quads[1], Quads[2], Quads[3]);
+    
     u16 Address = (Quads[1] << 8) | (Quads[2] << 4) | Quads[3];
     u8 RegX = (u8)Quads[1];
     u8 RegY = (u8)Quads[2];
@@ -140,84 +142,152 @@ CHIP8_CYCLE
         // NOTE(lex): CLS
         // NOTE(lex): Clear the screen
         printf("CLS\n");
+        
+        u32 *Pixel = Screen->Memory;
+        for(int Y = 0; Y < Screen->Height; Y++)
+        {
+            for(int X = 0; X < Screen->Width; X++)
+            {
+                *Pixel++ = BLACK;
+            }
+        }
     }
     else if(Instruction == 0x00EE)
     {
         // NOTE(lex): RET
         // NOTE(lex): Return from subroutine
         printf("RET\n");
+        
+        if(State->StackPointer > 0)
+        {
+            State->ProgramCounter = State->Stack[--State->StackPointer];
+        }
+        else
+        {
+            Assert(!"Cannot return, stack underflow");
+        }
     }
     else if(Quads[0] == 1)
     {
         // NOTE(lex): JP addr
         // NOTE(lex): Jump to address
-        printf("JP %d\n", Address);
+        printf("JP %x\n", Address);
+        
+        State->ProgramCounter = Address;
     }
     else if(Quads[0] == 2)
     {
         // NOTE(lex): CALL addr
         // NOTE(lex): Calls function at addr
         printf("CALL %d\n", Address);
+        
+        if(State->StackPointer <= ArrayCount(State->Stack))
+        {
+            State->Stack[State->StackPointer++] = State->ProgramCounter;
+            State->ProgramCounter = Address;
+        }
+        else
+        {
+            Assert(!"Cannot return, stack overflow");
+        }
     }
     else if(Quads[0] == 3)
     {
         // NOTE(lex): SE Vx, value
         // NOTE(lex): Skip next instruction if Vx = value
         printf("SE V%d, %d\n", RegX, Value);
+        
+        if(State->Registers[RegX] == Value)
+        {
+            State->ProgramCounter += 2;
+        }
     }
     else if(Quads[0] == 4)
     {
         // NOTE(lex): SNE Vx, value
         // NOTE(lex): Skip next instruction if Vx != value
         printf("SNE V%d, %d\n", RegX, Value);
+        
+        if(State->Registers[RegX] != Value)
+        {
+            State->ProgramCounter += 2;
+        }
     }
     else if((Quads[0] == 5) && (Quads[3] == 0))
     {
         // NOTE(lex): SE Vx, Vy
         // NOTE(lex): Skip next instruction if Vx = Vy
         printf("SE V%d, V%d\n", RegX, RegY);
+        
+        if(State->Registers[RegX] == State->Registers[RegY])
+        {
+            State->ProgramCounter += 2;
+        }
     }
     else if(Quads[0] == 6)
     {
         // NOTE(lex): LD Vx, value
         // NOTE(lex): Put value into register
         printf("LD V%d %d\n", RegX, Value);
+        
+        State->Registers[RegX] = Value;
     }
     else if(Quads[0] == 7)
     {
         // NOTE(lex): ADD Vx, value
         // NOTE(lex): Adds value to register
         printf("ADD V%d, %d\n", RegX, Value);
+        
+        State->Registers[RegX] += Value;
     }
     else if((Quads[0] == 8) && (Quads[3] == 0))
     {
         // NOTE(lex): LD Vx, Vy
         // NOTE(lex): Set RegX = RegY
         printf("LD V%d V%d\n", RegX, RegY);
+        
+        State->Registers[RegX] = State->Registers[RegY];
     }
     else if((Quads[0] == 8) && (Quads[3] == 1))
     {
         // NOTE(lex): OR Vx, Vy
         // NOTE(lex): Set RegX = (RegX | RegY)
         printf("OR V%d, V%d\n", RegX, RegY);
+        
+        State->Registers[RegX] = (State->Registers[RegX] | State->Registers[RegY]);
     }
     else if((Quads[0] == 8) && (Quads[3] == 2))
     {
         // NOTE(lex): AND Vx, Vy
         // NOTE(lex): Set RegX = (RegX & RegY)
         printf("AND V%d, V%d\n", RegX, RegY);
+        
+        State->Registers[RegX] = (State->Registers[RegX] & State->Registers[RegY]);
     }
     else if((Quads[0] == 8) && (Quads[3] == 3))
     {
         // NOTE(lex): XOR Vx, Vy
         // NOTE(lex): Set RegX = (RegX ^ RegY)
         printf("XOR V%d, V%d\n", RegX, RegY);
+        
+        State->Registers[RegX] = (State->Registers[RegX] ^ State->Registers[RegY]);
     }
     else if((Quads[0] == 8) && (Quads[3] == 4))
     {
         // NOTE(lex): ADD Vx, Vy
         // NOTE(lex): Set RegX = (RegX + RegY). If the results are greater than 8 bits, set RegF = 1, otherwise 0.
         printf("ADD V%d, V%d\n", RegX, RegY);
+        
+        u32 NewValue = (u32)RegX + (u32)RegY;
+        if(NewValue > 255)
+        {
+            State->Registers[0xF] = 1;
+        }
+        else
+        {
+            State->Registers[0xF] = 0;
+        }
+        State->Registers[RegX] = (u8)NewValue;
     }
     else if((Quads[0] == 8) && (Quads[3] == 5))
     {
@@ -239,7 +309,7 @@ CHIP8_CYCLE
         // NOTE(lex): If RegY > RegX, set RegX = RegY - RegX and RegF = 1.
         // NOTE(lex): Otherwise RegF = 0.
         // TODO(lex): What if RegY <= RegX, do I still subtract? Aren't registers unsigned, how does that work???
-        printf("XOR V%d, V%d\n", RegX, RegY);
+        printf("SUBN V%d, V%d\n", RegX, RegY);
     }
     else if((Quads[0] == 8) && (Quads[3] == 0xE))
     {
