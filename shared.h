@@ -32,6 +32,9 @@ typedef int b32;
 
 #define InvalidCodePath Assert(!"Invalid code path");
 
+#define WHITE 0xFFFFFFFF
+#define BLACK 0x000000FF
+
 typedef struct
 {
     u32 *Memory;
@@ -60,6 +63,9 @@ typedef struct
     
     u8 DelayTimer;
     u8 SoundTimer;
+    
+    b32 HaltUntilKeyPress;
+    u8 KeyPressRegister;
 } emulator_state;
 
 internal memory_block

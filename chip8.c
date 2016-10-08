@@ -8,9 +8,7 @@
 
 // TODO(lex): We don't compile with CRT here, remove asap-ly
 #include "stdio.h"
-
-#define WHITE 0xFFFFFFFF
-#define BLACK 0x000000FF
+#include "stdlib.h"
 
 internal void DrawRectangle(screen *Screen, int MinX, int MinY, int MaxX, int MaxY, u32 Color);
 
@@ -65,8 +63,8 @@ GetNextInstruction(emulator_state *State)
     
     if((State->ProgramCounter >= 0) && (State->ProgramCounter < State->Program.Bytes))
     {
-        Result = *(State->Program.Base + State->ProgramCounter++) << 8;
-        Result |= *(State->Program.Base + State->ProgramCounter++);
+        Result = *(State->MainMemory.Base + State->ProgramCounter++) << 8;
+        Result |= *(State->MainMemory.Base + State->ProgramCounter++);
     }
     
     return Result;
@@ -102,8 +100,8 @@ CHIP8_CYCLE
             if(FileSize <= ProgramMaxBytes)
             {
                 fread(State->Program.Base, 1, FileSize, FileHandle);
-                State->Program.Bytes = FileSize;
-                State->ProgramCounter = 0;
+                State->Program.Bytes = InternalMemoryBytes + FileSize;
+                State->ProgramCounter = (u16)InternalMemoryBytes;
             }
             else
             {
@@ -115,6 +113,18 @@ CHIP8_CYCLE
         else
         {
             Assert(!"Could not open file");
+        }
+    }
+    
+    if(State->HaltUntilKeyPress)
+    {
+        for(u8 ButtonIndex = 0; ButtonIndex <= 0xF; ButtonIndex++)
+        {
+            if(Input[ButtonIndex])
+            {
+                State->HaltUntilKeyPress = false;
+                State->Registers[State->KeyPressRegister] = ButtonIndex;
+            }
         }
     }
     
@@ -136,6 +146,7 @@ CHIP8_CYCLE
     u8 RegX = (u8)Quads[1];
     u8 RegY = (u8)Quads[2];
     u8 Value = (u8)((Quads[2] << 4) | Quads[3]);
+    u8 Nibble = (u8)Quads[3];
     
     if(Instruction == 0x00E0)
     {
@@ -278,7 +289,7 @@ CHIP8_CYCLE
         // NOTE(lex): Set RegX = (RegX + RegY). If the results are greater than 8 bits, set RegF = 1, otherwise 0.
         printf("ADD V%d, V%d\n", RegX, RegY);
         
-        u32 NewValue = (u32)RegX + (u32)RegY;
+        u32 NewValue = (u32)State->Registers[RegX] + (u32)State->Registers[RegY];
         if(NewValue > 255)
         {
             State->Registers[0xF] = 1;
@@ -295,13 +306,27 @@ CHIP8_CYCLE
         // NOTE(lex): If RegX > RegY, set RegX = RegX - RegY and RegF = 1.
         // NOTE(lex): Otherwise RegF = 0.
         // TODO(lex): What if RegX <= RegY, do I still subtract? Aren't registers unsigned, how does that work???
-        printf("XOR V%d, V%d\n", RegX, RegY);
+        printf("SUB V%d, V%d\n", RegX, RegY);
+        
+        if(State->Registers[RegX] > State->Registers[RegY])
+        {
+            State->Registers[0xF] = 1;
+        }
+        else
+        {
+            State->Registers[0xF] = 0;
+        }
+        
+        State->Registers[RegX] -= State->Registers[RegY];
     }
     else if((Quads[0] == 8) && (Quads[3] == 6))
     {
         // NOTE(lex): SHR Vx
         // NOTE(lex): Set RegX = RegX >> 1. If LSB of RegX is 1, set RegF = 1 otherwise 0.
         printf("SHR V%d\n", RegX);
+        
+        State->Registers[0xF] = State->Registers[RegX] & 0x1;
+        State->Registers[RegX] = State->Registers[RegX] >> 1;
     }
     else if((Quads[0] == 8) && (Quads[3] == 7))
     {
@@ -310,101 +335,223 @@ CHIP8_CYCLE
         // NOTE(lex): Otherwise RegF = 0.
         // TODO(lex): What if RegY <= RegX, do I still subtract? Aren't registers unsigned, how does that work???
         printf("SUBN V%d, V%d\n", RegX, RegY);
+        
+        if(State->Registers[RegY] > State->Registers[RegX])
+        {
+            State->Registers[0xF] = 1;
+        }
+        else
+        {
+            State->Registers[0xF] = 0;
+        }
+        
+        State->Registers[RegX] = State->Registers[RegY] - State->Registers[RegX];
     }
     else if((Quads[0] == 8) && (Quads[3] == 0xE))
     {
         // NOTE(lex): SHL Vx
         // NOTE(lex): Set RegX = RegX << 1. If MSB of RegX is 1, set RegF = 1 otherwise 0.
         printf("SHL V%d\n", RegX);
+        
+        State->Registers[0xF] = (State->Registers[RegX] & (1 << 7)) >> 7;
+        State->Registers[RegX] = State->Registers[RegX] << 1;
     }
     else if((Quads[0] == 9) && (Quads[3] == 0))
     {
         // NOTE(lex): SNE Vx, Vy
         // NOTE(lex): Skip next instruction if Vx != Vy
         printf("SNE V%d, V%d\n", RegX, RegY);
+        
+        if(State->Registers[RegX] != State->Registers[RegY])
+        {
+            State->ProgramCounter += 2;
+        }
     }
     else if(Quads[0] == 0xA)
     {
         // NOTE(lex): LD I, addr
         // NOTE(lex): Set RegI = addr
         printf("LD I,%d\n", Address);
+        
+        State->AddressRegister = Address;
     }
     else if(Quads[0] == 0xB)
     {
         // NOTE(lex): JP V0, addr
         // NOTE(lex): Program counter set to Reg0 + addr
         printf("JP V0, %d\n", Address);
+        
+        State->ProgramCounter = State->Registers[0] + Address;
     }
     else if(Quads[0] == 0xC)
     {
         // NOTE(lex): RND Vx, value
         // NOTE(lex): Vx = random byte AND value
         printf("RND V%d, %d\n", RegX, Value);
+        
+        State->Registers[RegX] = rand() % Value;
     }
     else if(Quads[0] == 0xD)
     {
         // NOTE(lex): DRW Vx, Vy, nibble
         // NOTE(lex): Display nibble-byte sprite (memory set in I) at position (RegX, RegY). Set RegF = collision.
+        printf("%DRW V%d, V%d, %d", RegX, RegY, Nibble);
+        
+        // TODO(lex): Fix memory errors when going out of bounds.
+        // TODO(lex): Specific case: going twice out of bounds
+        // TODO(lex): Do corner bounds work?
+        
+        u8 *SpriteMemory = State->MainMemory.Base + State->AddressRegister;
+        u8 BitIndex = 0;
+        u32 SpriteHeight = Nibble;
+        u32 SpriteWidth = 8;
+        
+        u32 StartPixelX = State->Registers[RegX];
+        u32 EndPixelX = StartPixelX + SpriteWidth - 1;
+        u32 StartPixelY = State->Registers[RegY];
+        u32 EndPixelY = StartPixelY + SpriteHeight - 1;
+        
+        for(u32 PixelY = StartPixelY; PixelY <= EndPixelY; PixelY++)
+        {
+            for(u32 PixelX = StartPixelX; PixelX <= EndPixelX; PixelX++)
+            {
+                u32 DrawX = PixelX;
+                u32 DrawY = PixelY;
+                
+                if(DrawX < 0) 
+                {
+                    DrawX = Screen->Width - DrawX;
+                }
+                else if(DrawX >= (u32)Screen->Width)
+                {
+                    DrawX = DrawX - Screen->Width;
+                }
+                if(DrawY < 0)
+                {
+                    DrawY = Screen->Height - DrawY;
+                }
+                else if(DrawY >= (u32)Screen->Height)
+                {
+                    DrawY = DrawY - Screen->Height;
+                }
+                
+                b32 PixelSet = (*SpriteMemory & (1 << BitIndex++)) >> BitIndex;
+                if(BitIndex == 8)
+                {
+                    SpriteMemory++;
+                    BitIndex = 0;
+                }
+                
+                u32 *Pixel = Screen->Memory + DrawY*Screen->Width + DrawX;
+                if(*Pixel == WHITE && PixelSet)
+                {
+                    *Pixel = BLACK;
+                    State->Registers[0xF] = 1;
+                }
+                else if(*Pixel == BLACK && PixelSet)
+                {
+                    *Pixel = WHITE;
+                    State->Registers[0xF] = 0;
+                }
+                else if(*Pixel == WHITE && !PixelSet)
+                {
+                    *Pixel = WHITE;
+                    State->Registers[0xF] = 0;
+                }
+                else
+                {
+                    *Pixel = BLACK;
+                    State->Registers[0xF] = 0;
+                }
+            }
+        }
     }
     else if((Quads[0] == 0xE) && (Quads[2] == 9) && (Quads[3] == 0xE))
     {
         // NOTE(lex): SKP Vx
         // NOTE(lex): Skip next instruction if key with value RegX is pressed
         printf("SKP V%d\n", Quads[1]);
+        
+        if(Input[State->Registers[RegX]])
+        {
+            State->ProgramCounter += 2;
+        }
     }
     else if((Quads[0] == 0xE) && (Quads[2] == 0xA) && (Quads[3] == 1))
     {
         // NOTE(lex): SKNP Vx
-        // NOTE(lex): Skil next instruction if key with value RegX is not pressed
+        // NOTE(lex): Skip next instruction if key with value RegX is not pressed
         printf("SKNP V%d\n", Quads[1]);
+        
+        if(!Input[State->Registers[RegX]])
+        {
+            State->ProgramCounter += 2;
+        }
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 0) && (Quads[3] == 7))
     {
         // NOTE(lex): LD Vx, DT
         // NOTE(lex): The value of the delay timer is placed into RegX
         printf("LD Vx, DT\n");
+        
+        State->Registers[RegX] = State->DelayTimer;
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 0) && (Quads[3] == 0xA))
     {
         // NOTE(lex): LD Vx, K
         // NOTE(lex): Wait for key press, store value of the key in RegX
         printf("LD Vx, K\n");
+        
+        State->HaltUntilKeyPress = true;
+        State->KeyPressRegister = RegX;
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 1) && (Quads[3] == 5))
     {
         // NOTE(lex): LD DT, Vx
         // NOTE(lex): Set delay timer equal to value of RegX
         printf("LD DT, Vx\n");
+        
+        State->DelayTimer = State->Registers[RegX];
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 1) && (Quads[3] == 8))
     {
         // NOTE(lex): LD ST, Vx
         // NOTE(lex): Sound timer set equal to RegX
         printf("LD ST, Vx\n");
+        
+        State->SoundTimer = State->Registers[RegX];
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 1) && (Quads[3] == 0xE))
     {
         // NOTE(lex): ADD I, Vx
         // NOTE(lex): Add RegI and RegX, store value in I
         printf("ADD I, Vx\n");
+        
+        State->AddressRegister += State->Registers[RegX];
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 2) && (Quads[3] == 9))
     {
         // NOTE(lex): LD F, Vx
         // NOTE(lex): Set RegI = Memory location of hexadecimal digit sprite location
         printf("LD F, Vx\n");
+        
+        
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 3) && (Quads[3] == 3))
     {
         // NOTE(lex): LD B, Vx
         // NOTE(lex): Takes decimal value of Regx and stores hundreds digit in I, tens digit in I+1, and ones in I+2.
         printf("LD B, Vx\n");
+        
+        
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 5) && (Quads[3] == 5))
     {
         // NOTE(lex): LD [I], Vx
         // NOTE(lex): Store registers Reg0..RegX in memory starting at location I.
         printf("LD [I], Vx\n");
+        
+        
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 6) && (Quads[3] == 5))
     {

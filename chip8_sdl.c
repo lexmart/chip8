@@ -67,6 +67,12 @@ int main(int argc, char *argv[])
             Screen.Width = GameScreen->w;
             Screen.Height = GameScreen->h;
             
+            for(int PixelIndex = 0; PixelIndex < Screen.Width*Screen.Height; PixelIndex++)
+            {
+                u32 *Pixel = Screen.Memory + PixelIndex;
+                *Pixel = BLACK;
+            }
+            
             memory_block MainMemory;
             MainMemory.Bytes = 4096;
             MainMemory.Base = (u8 *)malloc(MainMemory.Bytes); 
@@ -116,7 +122,7 @@ int main(int argc, char *argv[])
                 SDL_UpdateWindowSurface(Window);
                 // TODO(lex): What is the clock speed? 60 HZ? <- That's the speed at which timer goes down
                 // TODO(lex): Need to write code to take into account how long processing took
-                SDL_Delay(50);
+                SDL_Delay(20);
             }
             
             SDL_DestroyWindow(Window);
