@@ -12,3 +12,5 @@ chip8_assembler.exe [filename.chip8_source]
 To emulate an executable
 
 chip8_sdl.exe [filename.chip8_exe]
+
+*Only runs on Windows currently
