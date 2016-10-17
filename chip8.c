@@ -1,18 +1,15 @@
 /*
-// NOTE(lex): Thanks to http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#Dxyn for chip8 documentation!
+// NOTE(lex): Thanks to http://devernay.free.fr/hacks/chip8/C8TECH10.HTM for chip8 documentation!
 */
 
 #include "shared.h"
 #include "memory.h"
 #include "chip8_math.h"
 
-// TODO(lex): We don't compile with CRT here, remove asap-ly
 #include "stdio.h"
 #include "stdlib.h"
 
 internal void DrawRectangle(screen *Screen, int MinX, int MinY, int MaxX, int MaxY, u32 Color);
-
-#include "chip8_instructions.c"
 
 internal void
 DrawRectangle(screen *Screen, int MinX, int MinY, int MaxX, int MaxY, u32 Color)
@@ -140,7 +137,7 @@ CHIP8_CYCLE
     Quads[2] = GetQuadValue(Instruction, 1);
     Quads[3] = GetQuadValue(Instruction, 0);
     
-    printf("%x%x %x%x\n", Quads[0], Quads[1], Quads[2], Quads[3]);
+    //printf("%x%x %x%x\n", Quads[0], Quads[1], Quads[2], Quads[3]);
     
     u16 Address = (Quads[1] << 8) | (Quads[2] << 4) | Quads[3];
     u8 RegX = (u8)Quads[1];
@@ -322,11 +319,11 @@ CHIP8_CYCLE
     else if((Quads[0] == 8) && (Quads[3] == 6))
     {
         // NOTE(lex): SHR Vx
-        // NOTE(lex): Set RegX = RegX >> 1. If LSB of RegX is 1, set RegF = 1 otherwise 0.
+        // NOTE(lex): Store the value in RegY shifted right one bit in RegX
         printf("SHR V%d\n", RegX);
         
-        State->Registers[0xF] = State->Registers[RegX] & 0x1;
-        State->Registers[RegX] = State->Registers[RegX] >> 1;
+        State->Registers[0xF] = State->Registers[RegY] & 0x1;
+        State->Registers[RegX] = State->Registers[RegY] >> 1;
     }
     else if((Quads[0] == 8) && (Quads[3] == 7))
     {
@@ -350,11 +347,11 @@ CHIP8_CYCLE
     else if((Quads[0] == 8) && (Quads[3] == 0xE))
     {
         // NOTE(lex): SHL Vx
-        // NOTE(lex): Set RegX = RegX << 1. If MSB of RegX is 1, set RegF = 1 otherwise 0.
+        // NOTE(lex): Store the value in RegY shifted left one bit in RegX
         printf("SHL V%d\n", RegX);
         
-        State->Registers[0xF] = (State->Registers[RegX] & (1 << 7)) >> 7;
-        State->Registers[RegX] = State->Registers[RegX] << 1;
+        State->Registers[0xF] = (State->Registers[RegY] & (1 << 7)) >> 7;
+        State->Registers[RegX] = State->Registers[RegY] << 1;
     }
     else if((Quads[0] == 9) && (Quads[3] == 0))
     {
@@ -417,23 +414,10 @@ CHIP8_CYCLE
             {
                 u32 DrawX = PixelX;
                 u32 DrawY = PixelY;
+                Assert((DrawX >= 0) && (DrawY >= 0));
                 
-                if(DrawX < 0) 
-                {
-                    DrawX = Screen->Width - DrawX;
-                }
-                else if(DrawX >= (u32)Screen->Width)
-                {
-                    DrawX = DrawX - Screen->Width;
-                }
-                if(DrawY < 0)
-                {
-                    DrawY = Screen->Height - DrawY;
-                }
-                else if(DrawY >= (u32)Screen->Height)
-                {
-                    DrawY = DrawY - Screen->Height;
-                }
+                DrawX = DrawX % Screen->Width;
+                DrawY = DrawY % Screen->Height;
                 
                 b32 PixelSet = (*SpriteMemory & (1 << BitIndex++)) >> BitIndex;
                 if(BitIndex == 8)

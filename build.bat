@@ -3,7 +3,7 @@
 set EntryFile=../chip8_main.c
 set VariableFlags=
 
-set WarningFlags=-nologo -WX -W4 -wd4201 -wd4189 -wd4505 -wd4238 -wd4100 -wd4026
+set WarningFlags=-nologo -WX -W4 -wd4201 -wd4189 -wd4505 -wd4238 -wd4100 -wd4026 -wd4101 -wd4996
 
 REM -FC = Full path of source file in diagnostics (so emacs can parse errors/warning)
 REM -Zi = Creates debug information for Visual Studio debugger (Do I need to turn this off is release builds?)
@@ -25,6 +25,6 @@ cl %CompilerFlags% ..\chip8.c -LD -link -incremental:no /EXPORT:Chip8Cycle
 
 cl %CompilerFlags% ../chip8_sdl.c  /I W:\chip8\SDL\include /link chip8.lib /LIBPATH:W:\chip8\SDL\lib\x64 SDL2.lib SDL2main.lib /SUBSYSTEM:CONSOLE
 
-REM cl %CompilerFlags% ../chip8_assembler.c
+cl %CompilerFlags% ../chip8_assembler.c /link /incremental:no
 
 popd

@@ -1,0 +1,24 @@
+jp start
+ball:
+183C
+3C18
+
+start:
+ld v0, 3
+ld v1, 5
+ld va, 1
+ld vb, 3
+ld i, ball
+jp loop
+
+loop:
+call input
+drw v0, v1, 4
+jp loop
+
+input:
+sknp va
+sub v0, va
+sknp vb
+add v0, va
+ret

@@ -28,6 +28,15 @@ typedef int b32;
 
 #define ArrayCount(Array) (sizeof(Array)/(sizeof((Array)[0])))
 
+void ClearArray_(char *Array, int Length)
+{
+    for(int Index = 0; Index < Length; Index++)
+    {
+        Array[Index] = 0;
+    }
+}
+#define ClearArray(Array) ClearArray_(Array, ArrayCount(Array))
+
 #define Assert(Expression) if(!(Expression)) { *((int *)0) = 0; }
 
 #define InvalidCodePath Assert(!"Invalid code path");

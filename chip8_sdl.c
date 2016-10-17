@@ -55,10 +55,10 @@ int main(int argc, char *argv[])
         {
             SDL_Surface *WindowScreen = SDL_GetWindowSurface(Window);
             
-            u32 RedMask = 0xff000000;
-            u32 GreenMask = 0x00ff0000;
-            u32 BlueMask = 0x0000ff00;
-            u32 AlphaMask = 0x000000ff;
+            u32 RedMask = 0xFF000000;
+            u32 GreenMask = 0x00FF0000;
+            u32 BlueMask = 0x0000FF00;
+            u32 AlphaMask = 0x000000FF;
             SDL_Surface *GameScreen = SDL_CreateRGBSurface(0, 64, 32, 32, 
                                                            RedMask, GreenMask, BlueMask, AlphaMask);
             
