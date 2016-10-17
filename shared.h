@@ -75,6 +75,8 @@ typedef struct
     
     b32 HaltUntilKeyPress;
     u8 KeyPressRegister;
+    
+    char SourceFile[1024];
 } emulator_state;
 
 internal memory_block
@@ -86,4 +88,4 @@ CreateMemoryBlock(u8 *Base, int Bytes)
     return MemoryBlock;
 }
 
-#define CHIP8_CYCLE void Chip8Cycle(emulator_state *State, memory_block *MainMemory, screen *Screen, b32 *Input)
+#define CHIP8_CYCLE b32 Chip8Cycle(emulator_state *State, memory_block *MainMemory, screen *Screen, b32 *Input)

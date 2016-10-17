@@ -4,14 +4,17 @@ ball:
 3C18
 
 start:
-ld v0, 3
+ld v0, 5
 ld v1, 5
 ld va, 1
 ld vb, 3
+ld vc, 2
+ld vd, 5
 ld i, ball
 jp loop
 
 loop:
+cls
 call input
 drw v0, v1, 4
 jp loop
@@ -21,4 +24,8 @@ sknp va
 sub v0, va
 sknp vb
 add v0, va
+sknp vc
+sub v1, va
+sknp vd
+add v1, va
 ret

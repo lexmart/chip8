@@ -27,4 +27,9 @@ cl %CompilerFlags% ../chip8_sdl.c  /I W:\chip8\SDL\include /link chip8.lib /LIBP
 
 cl %CompilerFlags% ../chip8_assembler.c /link /incremental:no
 
+copy chip8_assembler.exe ..\roms
+copy chip8_sdl.exe ..\roms
+copy SDL2.dll ..\roms
+copy chip8.dll ..\roms
+
 popd

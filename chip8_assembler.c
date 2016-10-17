@@ -414,14 +414,39 @@ void GetLabelAddresses(label_hash_table *LabelHashTable, file_contents SourceFil
     }
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     u32 OutputProgramBytes = KiloBytes(3);
     u16 *OutputProgram = (u16 *)malloc(OutputProgramBytes);
     int OutputProgramInstructions = 0;
     memset(OutputProgram, 0, OutputProgramBytes);
     
-    file_contents SourceFileHandle = PlatformReadFile("test2.chip8");
+    char SourceFile[1024];
+    char DestFile[1024];
+    
+    if(argc >= 2)
+    {
+        strncpy(SourceFile, argv[1], ArrayCount(SourceFile));
+        
+        char *FileExtension = argv[1];
+        while(*FileExtension != '.')
+        {
+            FileExtension++;
+        }
+        FileExtension++;
+        
+        strcpy(FileExtension, "chip8_exe");
+        strncpy(DestFile, argv[1], ArrayCount(DestFile));
+    }
+    else
+    {
+        strcpy(SourceFile, "test.chip8_source");
+        strcpy(DestFile, "test.chip8_exe");
+    }
+    
+    
+    file_contents SourceFileHandle = PlatformReadFile(SourceFile);
+    
     char *CurrentCharacter = (char *)SourceFileHandle.Memory;
     char *OnePastLastCharacter = (char *)SourceFileHandle.Memory + SourceFileHandle.Size;
     
@@ -458,6 +483,6 @@ int main()
         ClearArray(InputLine);
     }
     
-    PlatformWriteFile("test.chip8", OutputProgram, OutputProgramBytes);
+    PlatformWriteFile(DestFile, OutputProgram, OutputProgramBytes);
     PlatformFreeFile(SourceFileHandle.Memory);
 }

@@ -86,7 +86,7 @@ CHIP8_CYCLE
         State->Program.Base = State->MainMemory.Base + 512;
         
         FILE *FileHandle = 0;
-        fopen_s(&FileHandle, "test.chip8", "rb");
+        fopen_s(&FileHandle, State->SourceFile, "rb");
         
         if(FileHandle)
         {
@@ -126,6 +126,8 @@ CHIP8_CYCLE
     }
     
     //Assert((State->ProgramCounter >= 0) && (State->ProgramCounter < State->Program.Bytes));
+    
+    b32 RewdrawScreen = false;
     
     u16 Instruction = GetNextInstruction(State);
     
@@ -429,7 +431,7 @@ CHIP8_CYCLE
                 u32 *Pixel = Screen->Memory + DrawY*Screen->Width + DrawX;
                 if(*Pixel == WHITE && PixelSet)
                 {
-                    *Pixel = BLACK;
+                    *Pixel = WHITE;
                     State->Registers[0xF] = 1;
                 }
                 else if(*Pixel == BLACK && PixelSet)
@@ -449,6 +451,8 @@ CHIP8_CYCLE
                 }
             }
         }
+        
+        RewdrawScreen = true;
     }
     else if((Quads[0] == 0xE) && (Quads[2] == 9) && (Quads[3] == 0xE))
     {
@@ -543,4 +547,6 @@ CHIP8_CYCLE
         // NOTE(lex): Load memory starting from I into registers Reg0..RegX.
         printf("LD Vx, [I]\n");
     }
+    
+    return RewdrawScreen;
 }

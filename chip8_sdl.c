@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
+#include <string.h>
+
 #include "SDL.h"
 #include "SDL_keyboard.h"
 #include "SDL_keycode.h"
@@ -80,6 +82,14 @@ int main(int argc, char *argv[])
             
             emulator_state State;
             memset(&State, 0, sizeof(emulator_state));
+            if(argc >= 2)
+            {
+                strncpy(&State.SourceFile[0], argv[1], ArrayCount(State.SourceFile));
+            }
+            else
+            {
+                strcpy(&State.SourceFile[0], "test.chip8_exe");
+            }
             
             b32 Input[16] = {0};
             
@@ -116,13 +126,16 @@ int main(int argc, char *argv[])
                 DestRect.w = WindowScreen->w;
                 DestRect.h = WindowScreen->h;
                 
-                Chip8Cycle(&State, &MainMemory, &Screen, Input);
-                SDL_BlitScaled(GameScreen, &SourceRect, WindowScreen, &DestRect);
+                b32 RedrawScreen = Chip8Cycle(&State, &MainMemory, &Screen, Input);
+                if(RedrawScreen)
+                {
+                    SDL_BlitScaled(GameScreen, &SourceRect, WindowScreen, &DestRect);
+                }
                 
                 SDL_UpdateWindowSurface(Window);
                 // TODO(lex): What is the clock speed? 60 HZ? <- That's the speed at which timer goes down
                 // TODO(lex): Need to write code to take into account how long processing took
-                SDL_Delay(20);
+                SDL_Delay(5);
             }
             
             SDL_DestroyWindow(Window);
