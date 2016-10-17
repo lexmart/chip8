@@ -5,6 +5,7 @@
 #include "shared.h"
 #include "memory.h"
 #include "chip8_math.h"
+#include "chip8_string.c"
 
 #include "stdio.h"
 #include "stdlib.h"
@@ -85,6 +86,9 @@ CHIP8_CYCLE
         int ProgramMaxBytes = MainMemory->Bytes - InternalMemoryBytes;
         State->Program.Base = State->MainMemory.Base + 512;
         
+        file_contents PreloadedData = PlatformReadFile("preloaded_data.chip8_source");
+        memcpy(State->MainMemory.Base, PreloadedData.Memory, InternalMemoryBytes);
+        
         FILE *FileHandle = 0;
         fopen_s(&FileHandle, State->SourceFile, "rb");
         
@@ -146,6 +150,11 @@ CHIP8_CYCLE
     u8 RegY = (u8)Quads[2];
     u8 Value = (u8)((Quads[2] << 4) | Quads[3]);
     u8 Nibble = (u8)Quads[3];
+    
+    if(State->DelayTimer > 0)
+    {
+        State->DelayTimer--;
+    }
     
     if(Instruction == 0x00E0)
     {
@@ -388,20 +397,16 @@ CHIP8_CYCLE
         // NOTE(lex): Vx = random byte AND value
         printf("RND V%d, %d\n", RegX, Value);
         
-        State->Registers[RegX] = rand() % Value;
+        State->Registers[RegX] = rand() & Value;
     }
     else if(Quads[0] == 0xD)
     {
         // NOTE(lex): DRW Vx, Vy, nibble
         // NOTE(lex): Display nibble-byte sprite (memory set in I) at position (RegX, RegY). Set RegF = collision.
-        printf("%DRW V%d, V%d, %d", RegX, RegY, Nibble);
-        
-        // TODO(lex): Fix memory errors when going out of bounds.
-        // TODO(lex): Specific case: going twice out of bounds
-        // TODO(lex): Do corner bounds work?
+        printf("%DRW V%d, V%d, %d\n", RegX, RegY, Nibble);
         
         u8 *SpriteMemory = State->MainMemory.Base + State->AddressRegister;
-        u8 BitIndex = 0;
+        int BitIndex = 7;
         u32 SpriteHeight = Nibble;
         u32 SpriteWidth = 8;
         
@@ -409,6 +414,8 @@ CHIP8_CYCLE
         u32 EndPixelX = StartPixelX + SpriteWidth - 1;
         u32 StartPixelY = State->Registers[RegY];
         u32 EndPixelY = StartPixelY + SpriteHeight - 1;
+        
+        b32 Collision = false;
         
         for(u32 PixelY = StartPixelY; PixelY <= EndPixelY; PixelY++)
         {
@@ -421,36 +428,35 @@ CHIP8_CYCLE
                 DrawX = DrawX % Screen->Width;
                 DrawY = DrawY % Screen->Height;
                 
-                b32 PixelSet = (*SpriteMemory & (1 << BitIndex++)) >> BitIndex;
-                if(BitIndex == 8)
+                b32 PixelSet = (*SpriteMemory & (1 << BitIndex)) >> BitIndex;
+                if(--BitIndex == -1)
                 {
                     SpriteMemory++;
-                    BitIndex = 0;
+                    BitIndex = 7;
                 }
                 
                 u32 *Pixel = Screen->Memory + DrawY*Screen->Width + DrawX;
                 if(*Pixel == WHITE && PixelSet)
                 {
-                    *Pixel = WHITE;
-                    State->Registers[0xF] = 1;
+                    *Pixel = BLACK;
+                    Collision = true;
                 }
                 else if(*Pixel == BLACK && PixelSet)
                 {
                     *Pixel = WHITE;
-                    State->Registers[0xF] = 0;
                 }
                 else if(*Pixel == WHITE && !PixelSet)
                 {
                     *Pixel = WHITE;
-                    State->Registers[0xF] = 0;
                 }
                 else
                 {
                     *Pixel = BLACK;
-                    State->Registers[0xF] = 0;
                 }
             }
         }
+        
+        State->Registers[0xF] = (u8)Collision;
         
         RewdrawScreen = true;
     }
@@ -523,7 +529,8 @@ CHIP8_CYCLE
         // NOTE(lex): Set RegI = Memory location of hexadecimal digit sprite location
         printf("LD F, Vx\n");
         
-        
+        u16 BytesPerNumber = 6;
+        State->AddressRegister = BytesPerNumber*(u16)State->Registers[RegX];
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 3) && (Quads[3] == 3))
     {
@@ -531,6 +538,10 @@ CHIP8_CYCLE
         // NOTE(lex): Takes decimal value of Regx and stores hundreds digit in I, tens digit in I+1, and ones in I+2.
         printf("LD B, Vx\n");
         
+        int Value = State->Registers[RegX];
+        State->MainMemory.Base[State->AddressRegister + 2] = Value % 10;
+        State->MainMemory.Base[State->AddressRegister + 1] = (Value / 10) % 10;
+        State->MainMemory.Base[State->AddressRegister + 0] = (Value / 100) % 10;
         
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 5) && (Quads[3] == 5))
@@ -539,13 +550,23 @@ CHIP8_CYCLE
         // NOTE(lex): Store registers Reg0..RegX in memory starting at location I.
         printf("LD [I], Vx\n");
         
-        
+        for(int RegisterIndex = 0; RegisterIndex <= RegX; RegisterIndex++)
+        {
+            State->MainMemory.Base[State->AddressRegister + RegisterIndex] 
+                = State->Registers[RegisterIndex];
+        }
     }
     else if((Quads[0] == 0xF) && (Quads[2] == 6) && (Quads[3] == 5))
     {
         // NOTE(lex): LD Vx, [I]
         // NOTE(lex): Load memory starting from I into registers Reg0..RegX.
         printf("LD Vx, [I]\n");
+        
+        for(int RegisterIndex = 0; RegisterIndex <= RegX; RegisterIndex++)
+        {
+            State->Registers[RegisterIndex] = 
+                State->MainMemory.Base[State->AddressRegister + RegisterIndex];
+        }
     }
     
     return RewdrawScreen;
